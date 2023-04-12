@@ -17,9 +17,9 @@ caps["devicesName"] = '127.0.0.1：62025'
 
 caps["ensureWebviewsHavePages"] = True
 level = -1
-MAX_LEVEL = 5
+MAX_LEVEL = 2
 driver = webdriver.Remote("http://127.0.0.1:4723/wd/hub", caps)
-driver.implicitly_wait(1)
+driver.implicitly_wait(3)
 
 old_click_by_text_set=set()#根据按钮text记录当前元素是否遍历过，防止重复遍历
 # old_xml_set = set()
@@ -154,123 +154,149 @@ def judge_action_by_text_list(text_list:[str]):
             print(datetime.datetime.now())
             print(datetime.datetime.now().timestamp())
 
-def dfs_2(parent_page,parent_click_list_num,grandparent_page,grandparent_click_list_num) ->int:
+def dfs_2(enter_text_list,parent_page,parent_click_list_num,grandparent_page,grandparent_click_list_num) ->int:
     """
-    深度优先搜索
-    :param parent_page:父界面
+        深度优先搜索,退出时退回到parent_page或者grandparent_page
+
+    :param parent_page:
+    :param parent_click_list_num:
+    :param grandparent_page:
+    :param grandparent_click_list_num:
     :return:
-    0：到达最大层数
-    1：当前界面已经访问过
-    2：意外回到父界面，如点击了back按钮
-    3：正常返回
+    0==达到最大层数
+    2==点击过程中意外回到父界面
+    3==正常遍历完所有按钮
+    4==点击过程中意外回到爷爷界面，孙子告诉孙子的父亲
+    5==点击过程中意外回到爷爷界面，孙子的父亲告诉爷爷
     """
     global level
     global MAX_LEVEL
     global old_click_by_text_set
     level = level + 1
     print('\t' * level, 'level=', {level})
-    code = 0
+
     if level == MAX_LEVEL:
         print('到达最大层数,返回')
+        for i in range(MAX_LEVEL * 2 + 1):
+            new_page = driver.page_source
+            new_click_list = driver.find_elements(By.XPATH, './/*[@clickable = "true"]')
+            time.sleep(2)
+            if i == MAX_LEVEL * 2:
+                print('多次返回仍无法回到父界面,测试崩溃,将该界面入口元素标记为黑名单')
+                time.sleep(2)
+                with open('../config/black_element_by_parse_text.txt', encoding='utf8', mode='a+') as f:
+                    f.write(str(enter_text_list) + '\n')
+                    exit(f'{enter_text_list}被收录至black_element_by_parse_text.txt')
+            if is_same(new_page, len(new_click_list), parent_page, parent_click_list_num):
+                print('返回父界面成功')
+                break
+            elif is_same(new_page, len(new_click_list), grandparent_page, grandparent_click_list_num):
+                print(f'意外回退到{enter_text_list}的爷爷界面')
+                code = 4
+                level = level - 1
+                print('level=', level)
+                return code
+            else:
+                i = i + 1
+                print(f'第{i}次尝试从{enter_text_list}返回父界面')
+                driver.back()
+                time.sleep(2)
         level = level - 1
         print('level=',level)
+        code = 0
         return code
-    current_page = driver.page_source
-
-    print('正在提取页面元素信息...')
-    current_click_list = driver.find_elements(By.XPATH, './/*[@clickable = "true"]')
-    print('页面元素提取成功!')
-    for i,click in enumerate (current_click_list):
-        print('正在遍历当前界面的第',i,'个按钮')
-        try:
-            text_list = parse_text_list(click)
-            print('当前按钮文字列表为',text_list)
-        except:
-            traceback.print_exc()
-            continue
-        else:
-            if not is_good_click(text_list):
-                continue
-            print('click on ', text_list)
-            judge_action_by_text_list(text_list)
+    else:#未达到最大层数，开始提取元素，遍历界面
+        current_page = driver.page_source
+        print('正在提取页面元素信息...')
+        current_click_list = driver.find_elements(By.XPATH, './/*[@clickable = "true"]')
+        print('页面元素提取成功!')
+        for i,click in enumerate (current_click_list):
+            print('正在遍历',enter_text_list,'界面的第',i+1,'个按钮')
             try:
-                click.click()
+                text_list = parse_text_list(click)
+                print('当前按钮文字列表为',text_list)
             except:
-                print(f'元素丢失', {click})
+                print('元素丢失')
                 continue
             else:
-                old_click_by_text_set.add(str(text_list))
-                time.sleep(2)
-                new_page = driver.page_source
-                new_click_list = driver.find_elements(By.XPATH, './/*[@clickable = "true"]')
-
-                if (dif(new_page, current_page) > 0.98):
-                    current_page = new_page
-                    print('点击无反应,忽略')
+                if not is_good_click(text_list):
                     continue
-                elif is_same(new_page, len(new_click_list),parent_page,parent_click_list_num):
-                    print('意外回退到父界面，将错就错，停止')
-                    level = level - 1
-                    code =2
-                    return code
-                elif is_same(new_page, len(new_click_list), grandparent_page, grandparent_click_list_num):
-                    print(f'意外回退到{text_list}的爷爷界面')
-                    code = 4
-                    level = level - 1
-                    print('level=', level)
-                    return code
+                print('click on ', text_list)
+                judge_action_by_text_list(text_list)
+                try:
+                    click.click()
+                except:
+                    print(f'元素丢失', {click})
+                    continue
                 else:
-                    print('进入新界面', text_list)
-                    code_child = dfs_2(current_page,len(current_click_list),parent_page,parent_click_list_num)
-                    if code_child ==4:#子界面遍历过程中意外跳转到爷爷界面,需要在父界面直接return，同时告知爷爷界面。
-                        level = level -1
-                        print('level=',level)
-                        code =5
+                    old_click_by_text_set.add(str(text_list))
+                    # time.sleep(2)
+                    new_page = driver.page_source
+                    new_click_list = driver.find_elements(By.XPATH, './/*[@clickable = "true"]')
+
+                    if (dif(new_page, current_page) > 0.98):
+                        current_page = new_page
+                        print('点击无反应,忽略')
+                        continue
+                    elif is_same(new_page, len(new_click_list),parent_page,parent_click_list_num):
+                        print('意外回退到父界面，将错就错，停止')
+                        level = level - 1
+                        code =2
                         return code
-                    elif code_child ==5:
-                        print('孙子界面意外跳转到本爷爷界面')
-                        # current_click_list = driver.find_elements(By.XPATH, './/*[@clickable = "true"]')#重新更新爷爷界面list，否则总丢失元素，不用担心重复遍历，因为有记录old_click_by_text_set
-                        continue
-                    elif code_child==2:#子界面遍历的过程中意外跳转到父界面
-                        # current_click_list = driver.find_elements(By.XPATH, './/*[@clickable = "true"]')#重新更新父界面list，否则总丢失元素，不用担心重复遍历，因为有记录old_click_by_text_set
-                        continue
-                    elif code_child in (0,1,3):
-                        for i in range(MAX_LEVEL * 2 + 1):
-                            new_page = driver.page_source
-                            new_click_list = driver.find_elements(By.XPATH, './/*[@clickable = "true"]')
-                            time.sleep(2)
-                            if i == MAX_LEVEL * 2:
-                                print('多次返回仍无法回到父界面,测试崩溃,将该界面入口元素标记为黑名单')
-                                time.sleep(2)
-                                with open('../config/black_element_by_parse_text.txt',encoding='utf8',mode='a+') as f:
-                                    f.write(str(text_list) + '\n')
-                                    exit(f'{text_list}被收录至black_element_by_parse_text.txt')
-                            if is_same(new_page,len(new_click_list),parent_page,parent_click_list_num):
-                                print(f'意外回退到{text_list}的爷爷界面')
-                                code = 4
-                                level = level -1
-                                print('level=', level)
+                    elif is_same(new_page, len(new_click_list), grandparent_page, grandparent_click_list_num):
+                        print(f'意外回退到{text_list}的爷爷界面')
+                        code = 4
+                        level = level - 1
+                        print('level=', level)
+                        return code
+                    else:
+                        print('进入新界面', text_list)
+                        code_child = dfs_2(text_list,current_page,len(current_click_list),parent_page,parent_click_list_num)#子dfs返回时，已经保证回退到进入dfs之前click之前的页面（即current_page），或者parent_page
+                        if code_child ==4:#子界面遍历过程中意外跳转到爷爷界面,需要在此界面直接return，同时告知爷爷界面。
+                            level = level -1
+                            print('level=',level)
+                            code =5
+                            return code
+                        elif code_child ==5:
+                            print('孙子界面意外跳转到本爷爷界面==',enter_text_list)
+                            # current_click_list = driver.find_elements(By.XPATH, './/*[@clickable = "true"]')#重新更新爷爷界面list，否则总丢失元素，不用担心重复遍历，因为有记录old_click_by_text_set
+                            continue
+                        elif code_child==2:#子界面遍历的过程中意外跳转到父界面(即当前current_page)
+                            # current_click_list = driver.find_elements(By.XPATH, './/*[@clickable = "true"]')#重新更新父界面list，否则总丢失元素，不用担心重复遍历，因为有记录old_click_by_text_set
+                            print('儿子界面意外跳转到本父亲界面==',enter_text_list)
+                            continue
+                        elif code_child ==0:
+                            print('儿子界面达到最大层数，直接返回到本父亲界面==',enter_text_list)
+                        elif code_child ==3:
+                            print('儿子界面所有文字按钮已经遍历完毕，正常返回本父亲界面==',enter_text_list)
 
-                                return code
-                            elif not is_same(new_page, len(new_click_list), current_page, len(current_click_list)):
-                                i = i + 1
-
-                                print(f'第{i}次尝试从{text_list}返回父界面')
-
-                                driver.back()
-                                time.sleep(2)
-                            elif is_same(new_page, len(new_click_list), current_page, len(current_click_list)):
-                                print('返回成功')
-
-                                current_page = new_page
-                                break
-                            else:
-                                print('error')
-                                exit('界面失控')
-    print('当前界面所有文字按钮已经遍历完毕')
+        print('当前界面==',enter_text_list,'所有文字按钮已经遍历完毕')
+    for i in range(MAX_LEVEL * 2 + 1):
+        new_page = driver.page_source
+        new_click_list = driver.find_elements(By.XPATH, './/*[@clickable = "true"]')
+        time.sleep(2)
+        if i == MAX_LEVEL * 2:
+            print('多次返回仍无法回到父界面,测试崩溃,将该界面入口元素标记为黑名单')
+            time.sleep(2)
+            with open('../config/black_element_by_parse_text.txt',encoding='utf8',mode='a+') as f:
+                f.write(str(enter_text_list) + '\n')
+                exit(f'{enter_text_list}被收录至black_element_by_parse_text.txt')
+        if is_same(new_page, len(new_click_list), parent_page, parent_click_list_num):
+            print('返回父界面成功')
+            break
+        elif is_same(new_page,len(new_click_list),grandparent_page,grandparent_click_list_num):
+            print(f'意外回退到{enter_text_list}的爷爷界面')
+            code = 4
+            level = level -1
+            print('level=', level)
+            return code
+        else:
+            i = i + 1
+            print(f'第{i}次尝试从{enter_text_list}返回父界面')
+            driver.back()
+            time.sleep(2)
     level = level - 1
     print('level=', level)
-
     code = 3
     return code
 
@@ -285,5 +311,5 @@ if __name__ == '__main__':
     initital()
     click_list_num = len(driver.find_elements(By.XPATH, './/*[@clickable = "true"]'))
     for i in range (click_list_num):
-        if dfs_2(driver.page_source,click_list_num,'',0) !=5 :
+        if dfs_2(['初始化页面'],driver.page_source,click_list_num,'',0) !=5 :
             break
