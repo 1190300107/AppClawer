@@ -82,7 +82,8 @@ def parse_text_list(element: webdriver.webelement.WebElement):
     :return:
     """
     try:
-        text_click_list = [element.find_element(By.XPATH, './/*[@text!=""]')]
+        # text_click_list = [element.find_element(By.XPATH, './/*[@text!=""]')]
+        text_click_list = [element.tag_name]
     except Exception as e:
         if 'Message: An element could not be located on the page using the given search param' in str(e):
             print('元素不包含文字')
@@ -113,7 +114,7 @@ def dif(str1, str2):
 def is_same(str1,click_list_num1, str2,click_list_num2):
     print('click_list_num1:',click_list_num1)
     print('click_list_num2:',click_list_num2)
-    return dif(str1,str2) >0.98 and (abs(click_list_num1-click_list_num2) <=2 or click_list_num1 ==0 or click_list_num2 ==0 )
+    return dif(str1,str2) >0.95 and (abs(click_list_num1-click_list_num2) <=2 or click_list_num1 ==0 or click_list_num2 ==0 )
 
 def is_good_click(text_list):
     """
@@ -133,16 +134,13 @@ def is_good_click(text_list):
     else:
         print(text_list,'is good! Just do it!')
         return True
-def filter_click_list(click_list:[webdriver.webelement.WebElement]):
+def search_element():
     """
-    筛选按钮,返回按钮的文字和坐标
-    :param click_list:
+    通过content-desc属性获取元素，后期根据坐标tap
     :return:
     """
-    for click in click_list:
-        pass
-        # if is_good_click(click):
-        #     pass
+    element_list = driver.find_elements(By.XPATH,'.//*[@text!=""]')
+    return element_list
 def judge_action_by_text_list(text_list:[str]):
     key_word = text_list[0]
     regex_action_map = {}
@@ -153,7 +151,13 @@ def judge_action_by_text_list(text_list:[str]):
             print(key_word,'命中规则:',regex,'判定行为:',action)
             print(datetime.datetime.now())
             print(datetime.datetime.now().timestamp())
-
+def parse_info_from_click(clicklist:[webdriver.webelement.WebElement]):
+    """
+    为了防止回溯之后，按钮丢失，将的上的text，location记录下载，后续根据这个记录去遍历，而不是根据原始的
+    :param clicklist:
+    :return:
+    """
+    pass
 def dfs_2(enter_text_list,parent_page,parent_click_list_num,grandparent_page,grandparent_click_list_num) ->int:
     """
         深度优先搜索,退出时退回到parent_page或者grandparent_page
@@ -179,7 +183,8 @@ def dfs_2(enter_text_list,parent_page,parent_click_list_num,grandparent_page,gra
         print('到达最大层数,返回')
         for i in range(MAX_LEVEL * 2 + 1):
             new_page = driver.page_source
-            new_click_list = driver.find_elements(By.XPATH, './/*[@clickable = "true"]')
+            # new_click_list = driver.find_elements(By.XPATH, './/*[@clickable = "true"]')
+            new_click_list = search_element()
             time.sleep(2)
             if i == MAX_LEVEL * 2:
                 print('多次返回仍无法回到父界面,测试崩溃,将该界面入口元素标记为黑名单')
@@ -208,15 +213,20 @@ def dfs_2(enter_text_list,parent_page,parent_click_list_num,grandparent_page,gra
     else:#未达到最大层数，开始提取元素，遍历界面
         current_page = driver.page_source
         print('正在提取页面元素信息...')
-        current_click_list = driver.find_elements(By.XPATH, './/*[@clickable = "true"]')
+        # current_click_list = driver.find_elements(By.XPATH, './/*[@clickable = "true"]')
+        current_click_list = search_element()
         print('页面元素提取成功!')
+
         for i,click in enumerate (current_click_list):
             print('正在遍历',enter_text_list,'界面的第',i+1,'个按钮')
             try:
-                text_list = parse_text_list(click)
+                # text_list = [click.tag_name]
+                text_list = []
+                text = click.get_attribute('text')
+                text_list.append(text)
                 print('当前按钮文字列表为',text_list)
-            except:
-                print('元素丢失')
+            except Exception as e:
+                print(str(e))
                 continue
             else:
                 if not is_good_click(text_list):
@@ -226,14 +236,14 @@ def dfs_2(enter_text_list,parent_page,parent_click_list_num,grandparent_page,gra
                 try:
                     click.click()
                 except:
-                    print(f'元素丢失', {click})
+                    print(f'元素丢失', {text_list})
                     continue
                 else:
                     old_click_by_text_set.add(str(text_list))
-                    # time.sleep(2)
+                    time.sleep(1)
                     new_page = driver.page_source
-                    new_click_list = driver.find_elements(By.XPATH, './/*[@clickable = "true"]')
-
+                    # new_click_list = driver.find_elements(By.XPATH, './/*[@clickable = "true"]')
+                    new_click_list = search_element()
                     if (dif(new_page, current_page) > 0.98):
                         current_page = new_page
                         print('点击无反应,忽略')
@@ -273,7 +283,8 @@ def dfs_2(enter_text_list,parent_page,parent_click_list_num,grandparent_page,gra
         print('当前界面==',enter_text_list,'所有文字按钮已经遍历完毕')
     for i in range(MAX_LEVEL * 2 + 1):
         new_page = driver.page_source
-        new_click_list = driver.find_elements(By.XPATH, './/*[@clickable = "true"]')
+        # new_click_list = driver.find_elements(By.XPATH, './/*[@clickable = "true"]')
+        new_click_list = search_element()
         time.sleep(2)
         if i == MAX_LEVEL * 2:
             print('多次返回仍无法回到父界面,测试崩溃,将该界面入口元素标记为黑名单')
