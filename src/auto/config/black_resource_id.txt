@@ -1,0 +1,4 @@
+com.sina.weibo:id/most_attitude
+com.sina.weibo:id/text_item
+com.sina.weibo:id/tv_groupName
+com.sina.weibo:id/item_text
