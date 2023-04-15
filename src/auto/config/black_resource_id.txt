@@ -1,4 +1,7 @@
-com.sina.weibo:id/most_attitude
-com.sina.weibo:id/text_item
-com.sina.weibo:id/tv_groupName
-com.sina.weibo:id/item_text
+most_attitude
+text_item
+tv_groupName
+item_text
+cancel
+tab
+bar
