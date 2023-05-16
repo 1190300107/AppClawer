@@ -3,7 +3,7 @@
 # @Email   : 289410265@qq.com
 # @Time    : 2023/3/19 22:09
 import time as Time
-
+import subprocess
 import re
 from datetime import datetime
 from difflib import SequenceMatcher
@@ -12,6 +12,7 @@ from appium.webdriver.common.touch_action import TouchAction
 from selenium.webdriver.common.by import By
 import xml.etree.ElementTree as ET
 from xmldiff import main
+import yaml
 import traceback
 
 caps = {}
@@ -20,7 +21,7 @@ caps["devicesName"] = '127.0.0.1：62025'
 
 caps["ensureWebviewsHavePages"] = True
 level = -1
-MAX_LEVEL = 2
+MAX_LEVEL = 3
 driver = webdriver.Remote("http://127.0.0.1:4723/wd/hub", caps)
 driver.implicitly_wait(5)
 
@@ -32,20 +33,17 @@ black_element_by_resource_id=[]
 
 def init_black_element():
     """
-    读取./config/black_element_by_parse_text.txt，初始化按钮黑名单
+    读取./config/black_element_by_parse_text.yaml，初始化按钮黑名单
     :return:
     """
     global black_element_by_parse_text
     global black_element_by_resource_id
-    with open('../config/black_element_by_parse_text.txt',encoding='utf8') as f:
-        black_list = f.readlines()
-        for item in black_list:
-            black_element_by_parse_text.append(eval(item))
+    with open('../config/black_element_by_parse_text.yaml',encoding='utf8') as f:
+        black_element_by_parse_text = yaml.load(f,yaml.FullLoader)
     print('black_element_by_parse_text:', black_element_by_parse_text)
-    with open('../config/black_resource_id.txt',encoding='utf8') as f:
-        black_list = f.readlines()
-        for item in black_list:
-            black_element_by_resource_id.append(item.strip('\n'))
+    with open('../config/black_resource_id.yaml',encoding='utf8') as f:
+        data  = yaml.load(f,Loader=yaml.FullLoader)
+        black_element_by_resource_id = data
     print('black_element_by_resource_id:',black_element_by_resource_id)
 
 def is_black(click) -> bool:
@@ -171,17 +169,34 @@ def search_element():
     """
     element_list = driver.find_elements(By.XPATH,'.//*[@text!=""]')
     return element_list
-def judge_action_by_text_list(text_list:[str]):
-    key_word = text_list[0]
-    regex_action_map = {}
-    regex_action_map[r'\d+$'] = '点击纯数字'
-    for regex,action in regex_action_map.items():
-        pattern = re.compile(regex)
-        if pattern.match(key_word):
-            print(key_word,'命中规则:',regex,'判定行为:',action)
-            print(datetime.now())
-            print(datetime.now().timestamp())
-            return action
+def judge_action_by_text_list(text:str):
+    with open ('../config/action_keyword.yaml', encoding='utf8') as f:
+        white_element_list = yaml.load(f,Loader=yaml.FullLoader)['action_list']
+    for item in white_element_list:
+        action = item.get('action')
+        keyword_list = item.get('keyword_list')
+        for keyword in keyword_list:
+            pattern = re.compile(keyword)
+            flag = pattern.search(text)
+            if flag:
+                print(text, '命中规则:', keyword, '判定行为:', pattern)
+                print(datetime.now())
+                print(datetime.now().timestamp())
+                return action
+    # key_word = text_list[0]
+    # regex_action_map = {}
+    # regex_action_map[r'\d+$'] = '点击纯数字'
+    # regex_action_map[r'赞$'] = '点赞'
+    # regex_action_map[r'快转$'] = '快转'
+    # regex_action_map[r'评论$'] = '评论'
+    # regex_action_map[r'快送$'] = '快送'
+    # for regex,action in regex_action_map.items():
+    #     pattern = re.compile(regex)
+    #     if pattern.match(key_word):
+    #         print(key_word,'命中规则:',regex,'判定行为:',action)
+    #         print(datetime.now())
+    #         print(datetime.now().timestamp())
+    #         return action
     return '未知行为'
 
 def parse_info_from_click(clicklist:[webdriver.webelement.WebElement]):
@@ -273,9 +288,10 @@ def dfs_2(enter_text,parent_page,grandparent_page) ->int:
             new_page = driver.page_source
             if i == MAX_LEVEL * 2:
                 print('多次返回仍无法回到父界面,测试崩溃,将该界面入口元素标记为黑名单')
-                with open('../config/black_element_by_parse_text.txt', encoding='utf8', mode='a+') as f:
-                    f.write(str([enter_text]) + '\n')
-                    exit(f'{enter_text}被收录至black_element_by_parse_text.txt')
+                with open('../config/black_element_by_parse_text.yaml', encoding='utf8', mode='a+') as f:
+                    # f.write(str([enter_text]) + '\n')
+                    # exit(f'{enter_text}被收录至black_element_by_parse_text.txt')
+                    yaml.dump([enter_text],f,encoding='utf8',allow_unicode=True)
             if is_same(new_page, parent_page):
                 print('返回父界面成功')
                 break
@@ -373,8 +389,9 @@ def dfs_2(enter_text,parent_page,grandparent_page) ->int:
             print('多次返回仍无法回到父界面,测试崩溃,将该界面入口元素标记为黑名单')
             Time.sleep(2)
             with open('../config/black_element_by_parse_text.txt',encoding='utf8',mode='a+') as f:
-                f.write([str(enter_text)] + '\n')
-                exit(f'{enter_text}被收录至black_element_by_parse_text.txt')
+                # f.write(str([enter_text]) + '\n')
+                # exit(f'{enter_text}被收录至black_element_by_parse_text.txt')
+                yaml.dump([enter_text], f, encoding='utf8', allow_unicode=True)
         if is_same(new_page, parent_page):
             print('返回父界面成功')
             break
@@ -398,10 +415,37 @@ def dfs_2(enter_text,parent_page,grandparent_page) ->int:
 def initital():
     print('init_black_element...')
     init_black_element()
+def start_fritap(app_name,pcap_dump_path='../pcap'):
+    cmd_find_app_id_process_name = "adb shell ps -d | grep %s | awk '{print $2,$8}'" %(app_name)
+    print(cmd_find_app_id_process_name)
+    child = subprocess.run(cmd_find_app_id_process_name,stdout=subprocess.PIPE)
+    if len(child.stdout) ==0:
+        print('定位pid失败')
+        raise
+    else:
+        for line in child.stdout.decode().split('\r\n')[:-1]:
+            print(line)
+            app_pid  = eval(line.split(' ')[0])
+            process_name =line.split(' ')[1].replace('.','-')
+            print(app_pid)
+            print(process_name)
+            cmd_start_fritap = f'python ../../../lib/friTap-main/friTap.py -m {app_pid} -p {pcap_dump_path}/{process_name}.pcap'
+            print(cmd_start_fritap)
+            subprocess.Popen(cmd_start_fritap, shell=True)
+
+
 
 
 if __name__ == '__main__':
+    while True:
+        app_name = input('请输入app名称:')
 
+        try:
+            start_fritap(app_name = app_name)
+        except:
+            traceback.print_exc()
+        else:
+            break
     initital()
     click_list_num = len(driver.find_elements(By.XPATH, './/*[@clickable = "true"]'))
     for i in range (click_list_num):

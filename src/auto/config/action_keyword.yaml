@@ -1,0 +1,25 @@
+action_list:
+  -
+    action:
+      点赞
+    keyword_list:
+      - ^赞\d*$
+      - ^点赞$
+  -
+    action:
+      评论
+    keyword_list:
+      - ^评论\d+$
+      - ^评论$
+  -
+    action:    
+      转发
+    keyword_list:
+      - ^转发$
+      - ^转发\d+$
+      - ^快转$
+  -
+    action:
+      点击纯数字
+    keyword_list:
+      - ^\d+$

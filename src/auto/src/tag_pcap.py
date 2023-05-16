@@ -70,7 +70,7 @@ def read_click_log(log_file:str):
 if __name__ == '__main__':
     click_log_file = r'../result/click_log.txt'
     click_log_list = read_click_log(click_log_file)
-    pcap_file = '../pcap/cn.pcap'
+    pcap_file = '../pcap/cntv0416.pcap'
     packet_list = read_pcap(pcap_file)
     for click_log in click_log_list:
         timestamp = click_log.timestamp
