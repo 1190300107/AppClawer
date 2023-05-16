@@ -67,10 +67,21 @@ def read_click_log(log_file:str):
         click_log = Click_log(log)
         click_log_list.append(click_log)
     return click_log_list
+def copy_pcap(dst_path:str):
+    """
+    从安卓手机中把tcpdump的pcap流量复制到windows中
+    :return:
+    """
+    app_name = input("请输入app名字,注意和pcap文件保持一致:")
+    cmd_pull = f"adb pull /data/local/tmp/{app_name}.pcap {dst_path}"
+    subprocess.run(cmd_pull)
+
 if __name__ == '__main__':
+
     click_log_file = r'../result/click_log.txt'
     click_log_list = read_click_log(click_log_file)
     pcap_dir = '../pcap/'
+    copy_pcap(pcap_dir)
     pcap_list = os.listdir(pcap_dir)
     for pcap in pcap_list:
         pcap_file = os.path.join(pcap_dir,pcap)

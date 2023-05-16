@@ -21,7 +21,7 @@ caps["devicesName"] = '127.0.0.1：62025'
 
 caps["ensureWebviewsHavePages"] = True
 level = -1
-MAX_LEVEL = 3
+MAX_LEVEL = 5
 driver = webdriver.Remote("http://127.0.0.1:4723/wd/hub", caps)
 driver.implicitly_wait(5)
 
@@ -60,13 +60,20 @@ def is_black(click) -> bool:
     resource_id = click['resource-id']
 
 
-    if [text] in black_element_by_parse_text:
-        print(click,'text命中黑名单')
-        return True
+    for black_text in black_element_by_parse_text:
+        pattern = re.compile(black_text)
+        flag = pattern.search(text)
+        if flag:
+            print(click,'text命中黑名单')
+            return True
     for black_resourece_id in black_element_by_resource_id:
         if resource_id is not None:
             resource_id = resource_id[ resource_id.find('/'):]  # 去除前面的包名
-            if black_resourece_id in resource_id:
+            pattern = re.compile(black_resourece_id)
+            flag = pattern.search(text)
+            if flag:
+                print(click, 'text命中黑名单')
+                return True
                 print(click, 'resource-id命中黑名单')
 
                 return True
@@ -179,7 +186,7 @@ def judge_action_by_text_list(text:str):
             pattern = re.compile(keyword)
             flag = pattern.search(text)
             if flag:
-                print(text, '命中规则:', keyword, '判定行为:', pattern)
+                print(text, '命中规则:', keyword, '判定行为:', action)
                 print(datetime.now())
                 print(datetime.now().timestamp())
                 return action
@@ -284,7 +291,7 @@ def dfs_2(enter_text,parent_page,grandparent_page) ->int:
 
     if level == MAX_LEVEL:
         print('到达最大层数,返回')
-        for i in range(MAX_LEVEL * 2 + 1):
+        for i in range(3):
             new_page = driver.page_source
             if i == MAX_LEVEL * 2:
                 print('多次返回仍无法回到父界面,测试崩溃,将该界面入口元素标记为黑名单')
@@ -340,8 +347,9 @@ def dfs_2(enter_text,parent_page,grandparent_page) ->int:
                     print(f'元素丢失', {text})
                     continue
                 else:
-                    old_click_by_text_set.add(text)
-                    Time.sleep(3)
+                    if judge_action_by_text_list(text) != '未知行为':
+                        old_click_by_text_set.add(text)
+                    Time.sleep(5)
                     new_page = driver.page_source
                     if (dif(new_page, current_page) > 0.98):
                         current_page = new_page
@@ -361,7 +369,7 @@ def dfs_2(enter_text,parent_page,grandparent_page) ->int:
                     else:
                         print('进入新界面', text)
                         log_click(click,time_start,timestamp_start)
-                        Time.sleep(5)
+                        Time.sleep(3)
                         code_child = dfs_2(text,current_page,parent_page)#子dfs返回时，已经保证回退到进入dfs之前click之前的页面（即current_page），或者parent_page
                         if code_child ==4:#子界面遍历过程中意外跳转到爷爷界面,需要在此界面直接return，同时告知爷爷界面。
                             level = level -1
@@ -382,7 +390,7 @@ def dfs_2(enter_text,parent_page,grandparent_page) ->int:
                             print('儿子界面所有文字按钮已经遍历完毕，正常返回本父亲界面==',enter_text)
 
         print('当前界面==',enter_text,'所有文字按钮已经遍历完毕')
-    for i in range(MAX_LEVEL * 2 + 1):
+    for i in range(3):
         new_page = driver.page_source
         Time.sleep(2)
         if i == MAX_LEVEL * 2:
@@ -416,6 +424,12 @@ def initital():
     print('init_black_element...')
     init_black_element()
 def start_fritap(app_name,pcap_dump_path='../pcap'):
+    """
+    使用fritap进行捕包，awk8是模拟器，awk9是真机
+    :param app_name:
+    :param pcap_dump_path:
+    :return:
+    """
     cmd_find_app_id_process_name = "adb shell ps -d | grep %s | awk '{print $2,$8}'" %(app_name)
     print(cmd_find_app_id_process_name)
     child = subprocess.run(cmd_find_app_id_process_name,stdout=subprocess.PIPE)
@@ -429,19 +443,33 @@ def start_fritap(app_name,pcap_dump_path='../pcap'):
             process_name =line.split(' ')[1].replace('\r\n','').replace(':','-')
             print(app_pid)
             print(process_name)
-            cmd_start_fritap = f'python ../../../lib/friTap-main/friTap.py -m {app_pid} -p {pcap_dump_path}/{process_name}.pcap'
+            cmd_start_fritap = f'python ../../../lib/friTap-main/friTap.py -m {app_pid} -p {pcap_dump_path}/{process_name}-fritap.pcap'
             print(cmd_start_fritap)
             subprocess.Popen(cmd_start_fritap, shell=True)
-
-
-
-
+def start_tcpdump(app_name:str):
+    cmd_find_app_port = "adb shell netstat -tunep | grep %s | awk '{print $4}'"%(app_name)
+    print(cmd_find_app_port)
+    child = subprocess.run(cmd_find_app_port,stdout=subprocess.PIPE)
+    if len(child.stdout) ==0:
+        print('定位pid失败')
+        raise
+    else:
+        port_list =[]
+        for line in child.stdout.decode().split('\r\n')[:-1]:
+            print(line)
+            port = line.split(' ')[0].split(':')[-1]
+            print(port)
+            port_list.append(port)
+        port_str = ' or '.join(port_list)
+        cmd_start_tcpdump = 'adb shell tcpdump port '+port_str+f' -w /data/local/tmp/{app_name}.pcap'
+        print(cmd_start_tcpdump)
+        subprocess.Popen(cmd_start_tcpdump,shell=True)
 if __name__ == '__main__':
     while True:
         app_name = input('请输入app名称:')
-
         try:
             start_fritap(app_name = app_name)
+            start_tcpdump(app_name=app_name)
         except:
             traceback.print_exc()
         else:
