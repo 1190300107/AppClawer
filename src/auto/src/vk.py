@@ -426,7 +426,7 @@ def start_fritap(app_name,pcap_dump_path='../pcap'):
         for line in child.stdout.decode().split('\r\n')[:-1]:
             print(line)
             app_pid  = eval(line.split(' ')[0])
-            process_name =line.split(' ')[1].replace('.','-')
+            process_name =line.split(' ')[1].replace('\r\n','').replace(':','-')
             print(app_pid)
             print(process_name)
             cmd_start_fritap = f'python ../../../lib/friTap-main/friTap.py -m {app_pid} -p {pcap_dump_path}/{process_name}.pcap'

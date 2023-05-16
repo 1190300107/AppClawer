@@ -197,3 +197,16 @@
 2023-05-16 11:15:35.073609	{'text': '推荐', 'location': {'x': 124, 'y': 132}, 'resource-id': None}	未知行为	1684206935.073609
 2023-05-16 11:15:52.915100	{'text': '小说', 'location': {'x': 232, 'y': 132}, 'resource-id': None}	未知行为	1684206952.9151
 2023-05-16 11:16:06.599326	{'text': '民间邪乎事儿', 'location': {'x': 108, 'y': 64}, 'resource-id': 'com.ximalaya.ting.android:id/main_tv_search'}	未知行为	1684206966.599326
+2023-05-16 11:28:51.117861	{'text': '非遗里的中国', 'location': {'x': 92, 'y': 62}, 'resource-id': 'cn.cntvnews:id/search_marquee_text'}	未知行为	1684207731.117861
+2023-05-16 11:29:04.292281	{'text': '1', 'location': {'x': 26, 'y': 232}, 'resource-id': 'cn.cntvnews:id/tv_topic_num'}	点击纯数字	1684207744.292281
+2023-05-16 11:29:15.875872	{'text': '跨境陆海联运“新丝路”', 'location': {'x': 104, 'y': 56}, 'resource-id': 'android:id/search_src_text'}	未知行为	1684207755.875872
+2023-05-16 11:30:12.752823	{'text': '习近平同厄立特里亚总统举行会谈', 'location': {'x': 96, 'y': 499}, 'resource-id': 'com.sina.weibo:id/tv_coupon_des'}	未知行为	1684207812.752823
+2023-05-16 11:30:26.578437	{'text': '41.5万次观看', 'location': {'x': 44, 'y': 1224}, 'resource-id': None}	未知行为	1684207826.578437
+2023-05-16 11:30:38.908736	{'text': '全屏观看', 'location': {'x': 514, 'y': 1100}, 'resource-id': 'com.sina.weibo:id/tv_fullscrrenview'}	未知行为	1684207838.908736
+2023-05-16 11:30:58.258050	{'text': '央视新闻', 'location': {'x': 120, 'y': 1547}, 'resource-id': 'com.sina.weibo:id/nickname_new_ui_message'}	未知行为	1684207858.25805
+2023-05-16 11:31:40.706898	{'text': '习近平同厄立特里亚总统举行会谈', 'location': {'x': 96, 'y': 499}, 'resource-id': 'com.sina.weibo:id/tv_coupon_des'}	未知行为	1684207900.706898
+2023-05-16 11:31:54.162480	{'text': '41.6万次观看', 'location': {'x': 44, 'y': 1224}, 'resource-id': None}	未知行为	1684207914.16248
+2023-05-16 11:32:07.085596	{'text': '全屏观看', 'location': {'x': 514, 'y': 1101}, 'resource-id': 'com.sina.weibo:id/tv_fullscrrenview'}	未知行为	1684207927.085596
+2023-05-16 11:32:26.118906	{'text': '央视新闻', 'location': {'x': 120, 'y': 1547}, 'resource-id': 'com.sina.weibo:id/nickname_new_ui_message'}	未知行为	1684207946.118906
+2023-05-16 11:33:11.447829	{'text': '直播', 'location': {'x': 8, 'y': 132}, 'resource-id': None}	未知行为	1684207991.447829
+2023-05-16 11:33:33.910208	{'text': '小说', 'location': {'x': 232, 'y': 132}, 'resource-id': None}	未知行为	1684208013.910208

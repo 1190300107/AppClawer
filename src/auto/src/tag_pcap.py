@@ -70,9 +70,12 @@ def read_click_log(log_file:str):
 if __name__ == '__main__':
     click_log_file = r'../result/click_log.txt'
     click_log_list = read_click_log(click_log_file)
-    pcap_file = '../pcap/cntv0416.pcap'
-    packet_list = read_pcap(pcap_file)
-    for click_log in click_log_list:
-        timestamp = click_log.timestamp
-        creat_pcap_file = os.path.join(r'../taged_pcap',click_log.create_pcap_name())
-        tag_pcap(timestamp,packet_list,creat_pcap_file)
+    pcap_dir = '../pcap/'
+    pcap_list = os.listdir(pcap_dir)
+    for pcap in pcap_list:
+        pcap_file = os.path.join(pcap_dir,pcap)
+        packet_list = read_pcap(pcap_file)
+        for click_log in click_log_list:
+            timestamp = click_log.timestamp
+            creat_pcap_file = os.path.join(r'../taged_pcap',click_log.create_pcap_name())
+            tag_pcap(timestamp,packet_list,creat_pcap_file)
