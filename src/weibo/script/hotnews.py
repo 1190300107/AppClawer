@@ -4,7 +4,6 @@
 # pip install Appium-Python-Client
 # Then you can paste this into a file and simply run with Python
 import time
-time.sleep(5)
 from appium.webdriver.common.touch_action import TouchAction
 from appium import webdriver
 from time import sleep

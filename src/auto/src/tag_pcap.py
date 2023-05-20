@@ -73,7 +73,7 @@ def copy_pcap(dst_path:str):
     :return:
     """
     app_name = input("请输入app名字,注意和pcap文件保持一致:")
-    cmd_pull = f"adb pull /data/local/tmp/{app_name}.pcap {dst_path}"
+    cmd_pull = f"adb pull /data/local/tmp/{app_name}-tcpdump.pcap {dst_path}"
     subprocess.run(cmd_pull)
 
 if __name__ == '__main__':

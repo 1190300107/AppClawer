@@ -2,6 +2,7 @@
 # @Author  : Wang Zhenghao
 # @Email   : 289410265@qq.com
 # @Time    : 2023/3/19 22:09
+import sys
 import time as Time
 import subprocess
 import re
@@ -14,7 +15,8 @@ import xml.etree.ElementTree as ET
 from xmldiff import main
 import yaml
 import traceback
-
+sys.path.append('../../')
+from lib.exception.originexception import Origin_exception
 caps = {}
 caps["platformName"] = "Android"
 caps["devicesName"] = '127.0.0.1：62025'
@@ -23,14 +25,14 @@ caps["ensureWebviewsHavePages"] = True
 level = -1
 MAX_LEVEL = 5
 driver = webdriver.Remote("http://127.0.0.1:4723/wd/hub", caps)
-driver.implicitly_wait(5)
+driver.implicitly_wait(300)
 
 old_click_by_text_set=set()#根据按钮text记录当前元素是否遍历过，防止重复遍历
-# old_xml_set = set()
+old_xml_set = set()
 black_list_content_desc = ['back']
 black_element_by_parse_text = []
 black_element_by_resource_id=[]
-
+origin_page =driver.page_source    #初始界面，即未打开app之前的界面
 def init_black_element():
     """
     读取./config/black_element_by_parse_text.yaml，初始化按钮黑名单
@@ -72,10 +74,7 @@ def is_black(click) -> bool:
             pattern = re.compile(black_resourece_id)
             flag = pattern.search(text)
             if flag:
-                print(click, 'text命中黑名单')
-                return True
                 print(click, 'resource-id命中黑名单')
-
                 return True
     return False
 def is_old(click)->bool:
@@ -183,8 +182,12 @@ def judge_action_by_text_list(text:str):
         action = item.get('action')
         keyword_list = item.get('keyword_list')
         for keyword in keyword_list:
-            pattern = re.compile(keyword)
-            flag = pattern.search(text)
+            try:
+                pattern = re.compile(keyword)
+                flag = pattern.search(text)
+            except:
+                print(keyword,'编译失败')
+                traceback.print_exc()
             if flag:
                 print(text, '命中规则:', keyword, '判定行为:', action)
                 print(datetime.now())
@@ -268,30 +271,32 @@ def update_element(click):
         new_location =parse_info_from_click_list[index]['location']
     return update_code,new_location
 
-def dfs_2(enter_text,parent_page,grandparent_page) ->int:
+def dfs(enter_text,parent_page,grandparent_page) ->int:
     """
-        深度优先搜索,退出时退回到parent_page或者grandparent_page
 
-    :param parent_page:
-    :param parent_click_list_num:
-    :param grandparent_page:
-    :param grandparent_click_list_num:
+    :param enter_text:当前界面入口
+    :param parent_page:当前界面的父界面
+    :param grandparent_page:当前界面的爷爷界面
     :return:
     0==达到最大层数
     2==点击过程中意外回到父界面
     3==正常遍历完所有按钮
     4==点击过程中意外回到爷爷界面，孙子告诉孙子的父亲
     5==点击过程中意外回到爷爷界面，孙子的父亲告诉爷爷
+
     """
     global level
     global MAX_LEVEL
     global old_click_by_text_set
+    global origin_page
+    driver.implicitly_wait(3)
+
     level = level + 1
     print('\t' * level, 'level=', {level})
 
     if level == MAX_LEVEL:
         print('到达最大层数,返回')
-        for i in range(3):
+        for i in range(MAX_LEVEL * 2 +1):
             new_page = driver.page_source
             if i == MAX_LEVEL * 2:
                 print('多次返回仍无法回到父界面,测试崩溃,将该界面入口元素标记为黑名单')
@@ -299,7 +304,11 @@ def dfs_2(enter_text,parent_page,grandparent_page) ->int:
                     # f.write(str([enter_text]) + '\n')
                     # exit(f'{enter_text}被收录至black_element_by_parse_text.txt')
                     yaml.dump([enter_text],f,encoding='utf8',allow_unicode=True)
-            if is_same(new_page, parent_page):
+                    raise Origin_exception(enter_text)
+            elif is_same(new_page, origin_page):
+                print('回退到桌面，抛出异常，重新开始')
+                raise Origin_exception(enter_text)
+            elif is_same(new_page, parent_page):
                 print('返回父界面成功')
                 break
             elif is_same(new_page,  grandparent_page):
@@ -347,14 +356,21 @@ def dfs_2(enter_text,parent_page,grandparent_page) ->int:
                     print(f'元素丢失', {text})
                     continue
                 else:
-                    if judge_action_by_text_list(text) != '未知行为':
+                    action = judge_action_by_text_list(text)
+                    if action == '未知行为':
+                        print(text,'是未知行为，添加到旧名单当中')
                         old_click_by_text_set.add(text)
-                    Time.sleep(5)
+                    else:
+                        print(text, '是',action,'行为','无需添加到旧名单')
+                    Time.sleep(2)
                     new_page = driver.page_source
                     if (dif(new_page, current_page) > 0.98):
                         current_page = new_page
                         print('点击无反应,忽略')
                         continue
+                    elif is_same(new_page,origin_page):
+                        print('回退到桌面，抛出异常，重新开始')
+                        raise Origin_exception(enter_text)
                     elif is_same(new_page,parent_page):
                         print('意外回退到父界面，将错就错，停止')
                         level = level - 1
@@ -370,7 +386,7 @@ def dfs_2(enter_text,parent_page,grandparent_page) ->int:
                         print('进入新界面', text)
                         log_click(click,time_start,timestamp_start)
                         Time.sleep(3)
-                        code_child = dfs_2(text,current_page,parent_page)#子dfs返回时，已经保证回退到进入dfs之前click之前的页面（即current_page），或者parent_page
+                        code_child = dfs(text,current_page,parent_page)#子dfs返回时，已经保证回退到进入dfs之前click之前的页面（即current_page），或者parent_page
                         if code_child ==4:#子界面遍历过程中意外跳转到爷爷界面,需要在此界面直接return，同时告知爷爷界面。
                             level = level -1
                             print('level=',level)
@@ -378,7 +394,9 @@ def dfs_2(enter_text,parent_page,grandparent_page) ->int:
                             return code
                         elif code_child ==5:
                             print('孙子界面意外跳转到本爷爷界面==',enter_text)
-                            # current_click_list = driver.find_elements(By.XPATH, './/*[@clickable = "true"]')#重新更新爷爷界面list，否则总丢失元素，不用担心重复遍历，因为有记录old_click_by_text_set
+                            current_click_list.append(click)#将孙子界面的父界面入口重新添加到队列尾部
+                            if text in old_click_by_text_set:
+                                old_click_by_text_set.remove(text)#孙子界面的父界面入口从旧名单中除去
                             continue
                         elif code_child==2:#子界面遍历的过程中意外跳转到父界面(即当前current_page)
                             # current_click_list = driver.find_elements(By.XPATH, './/*[@clickable = "true"]')#重新更新父界面list，否则总丢失元素，不用担心重复遍历，因为有记录old_click_by_text_set
@@ -390,19 +408,24 @@ def dfs_2(enter_text,parent_page,grandparent_page) ->int:
                             print('儿子界面所有文字按钮已经遍历完毕，正常返回本父亲界面==',enter_text)
 
         print('当前界面==',enter_text,'所有文字按钮已经遍历完毕')
-    for i in range(3):
+    for i in range(MAX_LEVEL * 2 +1):
         new_page = driver.page_source
         Time.sleep(2)
         if i == MAX_LEVEL * 2:
             print('多次返回仍无法回到父界面,测试崩溃,将该界面入口元素标记为黑名单')
             Time.sleep(2)
-            with open('../config/black_element_by_parse_text.txt',encoding='utf8',mode='a+') as f:
+            with open('../config/black_element_by_parse_text.yaml',encoding='utf8',mode='a+') as f:
                 # f.write(str([enter_text]) + '\n')
                 # exit(f'{enter_text}被收录至black_element_by_parse_text.txt')
                 yaml.dump([enter_text], f, encoding='utf8', allow_unicode=True)
-        if is_same(new_page, parent_page):
+                raise  Origin_exception(enter_text)
+        elif is_same(new_page, origin_page):
+            print('回退到桌面，抛出异常，重新开始')
+            raise Origin_exception(enter_text)
+        elif is_same(new_page, parent_page):
             print('返回父界面成功')
             break
+
         elif is_same(new_page,grandparent_page):
             print(f'意外回退到{enter_text}的爷爷界面')
             code = 4
@@ -443,7 +466,7 @@ def start_fritap(app_name,pcap_dump_path='../pcap'):
             process_name =line.split(' ')[1].replace('\r\n','').replace(':','-')
             print(app_pid)
             print(process_name)
-            cmd_start_fritap = f'python ../../../lib/friTap-main/friTap.py -m {app_pid} -p {pcap_dump_path}/{process_name}-fritap.pcap'
+            cmd_start_fritap = f'python ../../../lib/friTap-main/friTap.py -m {app_pid} -p {pcap_dump_path}/{process_name}-{app_pid}-{datetime.now().timestamp()}-fritap.pcap'
             print(cmd_start_fritap)
             subprocess.Popen(cmd_start_fritap, shell=True)
 def start_tcpdump(app_name:str):
@@ -461,21 +484,54 @@ def start_tcpdump(app_name:str):
             print(port)
             port_list.append(port)
         port_str = ' or '.join(port_list)
-        cmd_start_tcpdump = 'adb shell tcpdump port '+port_str+f' -w /data/local/tmp/{app_name}.pcap'
+        cmd_start_tcpdump = 'adb shell tcpdump port '+port_str+f' -w /data/local/tmp/{app_name}-{datetime.now().timestamp()}-tcpdump.pcap'
         print(cmd_start_tcpdump)
         subprocess.Popen(cmd_start_tcpdump,shell=True)
 if __name__ == '__main__':
+
+    initital()
     while True:
-        app_name = input('请输入app名称:')
+        app_package = input('请输入app包名:')
+        app_activity = input('请输入app活动名')
+        print('正在启动app')
+        cmd_start_app = f'adb shell am start -n {app_package}/{app_activity}'
+        print(cmd_start_app)
+        child = subprocess.run(cmd_start_app, stderr=subprocess.PIPE)
+        Time.sleep(2)
+        if 'Error' in child.stderr.decode():
+            print(child.stderr.decode())
+            print('app启动失败,请输入正确的app包名和app活动名')
+            continue
+        else:
+            start_fritap(app_name=app_package)
+            start_tcpdump(app_name=app_package)
+            break
+    while True:
         try:
-            start_fritap(app_name = app_name)
-            start_tcpdump(app_name=app_name)
-        except:
-            traceback.print_exc()
+            dfs(['初始化页面'],origin_page,origin_page)
+        except Origin_exception:
+            print('正在杀死app')
+            cmd_kill_app = "adb shell ps -d | grep %s |  awk '{print $3}'"%(app_package)
+            print(cmd_kill_app)
+            child = subprocess.run(cmd_kill_app,stdout=subprocess.PIPE)
+            for pid in child.stdout.decode().split('\r\n')[:-1]:
+                cmd_kill_pid = f"adb shell kill {pid}"
+                print(cmd_kill_pid)
+                subprocess.run(cmd_kill_pid)
+            Time.sleep(10)
+            print('正在重新启动app')
+            cmd_start_app = f'adb shell am start -n {app_package}/{app_activity}'
+            child = subprocess.run(cmd_start_app, stdout=subprocess.PIPE)
+            Time.sleep(10)
+            level = -1
+            start_fritap(app_name=app_package)
+            start_tcpdump(app_name=app_package)
+            print('正在重新建立连接')
+            driver = webdriver.Remote("http://127.0.0.1:4723/wd/hub", caps)
+            Time.sleep(10)
+            origin_page = driver.page_source
+
+            continue
         else:
             break
-    initital()
-    click_list_num = len(driver.find_elements(By.XPATH, './/*[@clickable = "true"]'))
-    for i in range (click_list_num):
-        if dfs_2(['初始化页面'],driver.page_source,driver.page_source) !=5 :
-            break
+
