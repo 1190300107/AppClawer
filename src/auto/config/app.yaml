@@ -1,0 +1,43 @@
+-
+  app_name:
+    新浪微博
+  app_package:
+    com.sina.weibo
+  app_activity:
+    .MainTabActivity
+-
+  app_name:
+    央视新闻
+  app_package:
+    cn.cntvnews
+  app_activity:
+    com.torch.open.homeimpl.HomeActivity
+-
+  app_name:
+    喜马拉雅
+  app_package:
+    com.ximalaya.ting.android
+  app_activity:
+    .host.activity.MainActivity
+-
+  app_name:
+    QQ音乐
+  app_package:
+    com.tencent.qqmusic
+  app_activity:
+    .activity.AppStarterActivity
+-
+  app_name:
+    淘宝
+  app_package:
+    com.taobao.taobao
+  app_activity:
+    com.taobao.tao.TBMainActivity
+-
+  app_name:
+    QQ
+  app_package:
+    com.tencent.mobileqq
+  app_activity:
+    .activity.SplashActivity
+

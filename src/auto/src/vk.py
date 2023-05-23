@@ -2,6 +2,7 @@
 # @Author  : Wang Zhenghao
 # @Email   : 289410265@qq.com
 # @Time    : 2023/3/19 22:09
+import math
 import sys
 import time as Time
 import subprocess
@@ -15,7 +16,7 @@ import xml.etree.ElementTree as ET
 from xmldiff import main
 import yaml
 import traceback
-sys.path.append('../../')
+# sys.path.append('../../')
 from lib.exception.originexception import Origin_exception
 caps = {}
 caps["platformName"] = "Android"
@@ -33,6 +34,8 @@ black_list_content_desc = ['back']
 black_element_by_parse_text = []
 black_element_by_resource_id=[]
 origin_page =driver.page_source    #初始界面，即未打开app之前的界面
+width = driver.get_window_size()['width']#获得屏幕宽度
+height = driver.get_window_size()['height']#获得屏幕高度
 def init_black_element():
     """
     读取./config/black_element_by_parse_text.yaml，初始化按钮黑名单
@@ -141,6 +144,13 @@ def count_all_nodes(xml_string):
 #             return text_list
 
 
+def judge_old_xml(xml:str,old_xml_set:(str,)):
+    if len(old_xml_set) ==0:
+        return False
+    for item in old_xml_set:
+        if is_same(xml,item):
+            return True
+    return False
 def dif(str1, str2):
     print(SequenceMatcher(None, str1, str2).quick_ratio())
     return SequenceMatcher(None, str1, str2).quick_ratio()
@@ -229,6 +239,7 @@ def parse_info_from_click(clicklist:[webdriver.webelement.WebElement]):
                     resource_id = click.get_attribute('resource-id')
                     myclick['resource-id'] = resource_id
                 except:
+                    myclick['resource-id'] = None
                     print(text,'提取resource-id失败')
                 myclick_list.append(myclick)
 
@@ -237,6 +248,33 @@ def parse_info_from_click(clicklist:[webdriver.webelement.WebElement]):
             if """Message: Cached elements 'By.xpath: .//*[@text!=""]' do not exist in DOM anymore""" in str(e):
                 print('元素寻找失败')
     return myclick_list
+def sort_element(click:dict):
+    """
+    对元素进行排序时使用，
+    :param click:
+    :return:
+    """
+    center_x = width/2
+    center_y = height/2
+    x = click['location']['x']
+    y = click['location']['y']
+
+    value =0
+    if 'resource-id' in click:
+        resource_id = click['resource-id']
+    if resource_id is not None:
+        if resource_id.find('item'):
+            value = 10000
+        elif resource_id.find('group'):
+            value = 20000
+        elif resource_id.find('tab'):
+            value = 20000
+        elif resource_id.find('bar'):
+            value = 30000
+            math.pow
+    dist = math.sqrt( math.pow(center_x-x,2)+math.pow(center_y-y,2))
+    value = value +dist
+    return value
 def log_click(click,time,timestamp):
     """
     记录点击日志
@@ -279,6 +317,7 @@ def dfs(enter_text,parent_page,grandparent_page) ->int:
     :param grandparent_page:当前界面的爷爷界面
     :return:
     0==达到最大层数
+    1==当前界面已经搜索过
     2==点击过程中意外回到父界面
     3==正常遍历完所有按钮
     4==点击过程中意外回到爷爷界面，孙子告诉孙子的父亲
@@ -321,15 +360,50 @@ def dfs(enter_text,parent_page,grandparent_page) ->int:
                 i = i + 1
                 print(f'第{i}次尝试从{enter_text}返回父界面')
                 driver.back()
-                Time.sleep(2)
         level = level - 1
         print('level=',level)
         code = 0
         return code
+    elif judge_old_xml(driver.page_source,old_xml_set):
+        print('当前界面已经搜索过,返回')
+        for i in range(MAX_LEVEL * 2 +1):
+            new_page = driver.page_source
+            if i == MAX_LEVEL * 2:
+                print('多次返回仍无法回到父界面,测试崩溃,将该界面入口元素标记为黑名单')
+                with open('../config/black_element_by_parse_text.yaml', encoding='utf8', mode='a+') as f:
+                    # f.write(str([enter_text]) + '\n')
+                    # exit(f'{enter_text}被收录至black_element_by_parse_text.txt')
+                    yaml.dump([enter_text],f,encoding='utf8',allow_unicode=True)
+                    raise Origin_exception(enter_text)
+            elif is_same(new_page, origin_page):
+                print('回退到桌面，抛出异常，重新开始')
+                raise Origin_exception(enter_text)
+            elif is_same(new_page, parent_page):
+                print('返回父界面成功')
+                break
+            elif is_same(new_page,  grandparent_page):
+                print(f'意外回退到{enter_text}的爷爷界面')
+                code = 4
+                level = level - 1
+                print('level=', level)
+                return code
+            else:
+                i = i + 1
+                print(f'第{i}次尝试从{enter_text}返回父界面')
+                driver.back()
+        level = level - 1
+        print('level=',level)
+        code = 1
+        return code
     else:#未达到最大层数，开始提取元素，遍历界面
+        print(f'尝试在{enter_text}界面填充文字...')
+        input_all()
         current_page = driver.page_source
+        if level >2:#首页和较大的界面不要添加xmlold，否则重启app的时候可能会从主页直接退出
+            old_xml_set.add(current_page)
         print('正在提取页面元素信息...')
         current_click_list = parse_info_from_click(search_element())
+        current_click_list.sort(key=sort_element)#对按钮元素排序
         print(current_click_list)
         print('页面元素提取成功!')
 
@@ -384,6 +458,7 @@ def dfs(enter_text,parent_page,grandparent_page) ->int:
                         return code
                     else:
                         print('进入新界面', text)
+
                         log_click(click,time_start,timestamp_start)
                         Time.sleep(3)
                         code_child = dfs(text,current_page,parent_page)#子dfs返回时，已经保证回退到进入dfs之前click之前的页面（即current_page），或者parent_page
@@ -410,10 +485,10 @@ def dfs(enter_text,parent_page,grandparent_page) ->int:
         print('当前界面==',enter_text,'所有文字按钮已经遍历完毕')
     for i in range(MAX_LEVEL * 2 +1):
         new_page = driver.page_source
-        Time.sleep(2)
+        Time.sleep(1)
         if i == MAX_LEVEL * 2:
             print('多次返回仍无法回到父界面,测试崩溃,将该界面入口元素标记为黑名单')
-            Time.sleep(2)
+            Time.sleep(1)
             with open('../config/black_element_by_parse_text.yaml',encoding='utf8',mode='a+') as f:
                 # f.write(str([enter_text]) + '\n')
                 # exit(f'{enter_text}被收录至black_element_by_parse_text.txt')
@@ -436,14 +511,13 @@ def dfs(enter_text,parent_page,grandparent_page) ->int:
             i = i + 1
             print(f'第{i}次尝试从{enter_text}返回父界面')
             driver.back()
-            Time.sleep(2)
     level = level - 1
     print('level=', level)
     code = 3
     return code
 
 
-def initital():
+def initialize():
     print('init_black_element...')
     init_black_element()
 def start_fritap(app_name,pcap_dump_path='../pcap'):
@@ -487,17 +561,36 @@ def start_tcpdump(app_name:str):
         cmd_start_tcpdump = 'adb shell tcpdump port '+port_str+f' -w /data/local/tmp/{app_name}-{datetime.now().timestamp()}-tcpdump.pcap'
         print(cmd_start_tcpdump)
         subprocess.Popen(cmd_start_tcpdump,shell=True)
-if __name__ == '__main__':
+def input_all():
 
-    initital()
+    edit_text_list = driver.find_elements(By.XPATH,'.//android.widget.EditText')
+    if len(edit_text_list)>0:
+        for edit_text in edit_text_list:
+            input_word(edit_text)
+    else:
+        print('当前界面没有输入框')
+
+def input_word(edit_text:webdriver.webelement.WebElement,word='123456'):
+    """
+    根据word填充到edit_text中
+    :param edit_text:
+    :param word:
+    :return:
+    """
+
+    print(f'尝试将{word}填充{edit_text}')
+    edit_text.send_keys(word)
+
+if __name__ == '__main__':
+    initialize()
     while True:
         app_package = input('请输入app包名:')
-        app_activity = input('请输入app活动名')
+        app_activity = input('请输入app活动名:')
         print('正在启动app')
         cmd_start_app = f'adb shell am start -n {app_package}/{app_activity}'
         print(cmd_start_app)
         child = subprocess.run(cmd_start_app, stderr=subprocess.PIPE)
-        Time.sleep(2)
+        Time.sleep(10)
         if 'Error' in child.stderr.decode():
             print(child.stderr.decode())
             print('app启动失败,请输入正确的app包名和app活动名')
@@ -529,7 +622,6 @@ if __name__ == '__main__':
             print('正在重新建立连接')
             driver = webdriver.Remote("http://127.0.0.1:4723/wd/hub", caps)
             Time.sleep(10)
-            origin_page = driver.page_source
 
             continue
         else:

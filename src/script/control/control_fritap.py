@@ -13,10 +13,10 @@ from addcode import *
 filelist=[]
 def getfile()->list:
     global filelist
-    filelist=os.listdir(r'../script')
+    filelist=os.listdir(r'../script_code')
     filelist.remove('__init__.py')
     for i in range(len(filelist)):
-        filelist[i]= os.path.join('../script',filelist[i])
+        filelist[i]= os.path.join('../script_code', filelist[i])
     return filelist
 def initdir():#创建文件夹
     cmd='adb shell mkdir /data/local/tmp/weibo;'
