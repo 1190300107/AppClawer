@@ -11,7 +11,7 @@
   app_package:
     cn.cntvnews
   app_activity:
-    com.torch.open.homeimpl.HomeActivity
+    com.torch.open.shell.EntryActivity
 -
   app_name:
     喜马拉雅
@@ -32,7 +32,7 @@
   app_package:
     com.taobao.taobao
   app_activity:
-    com.taobao.tao.TBMainActivity
+    com.taobao.tao.welcome.Welcome
 -
   app_name:
     QQ
@@ -40,4 +40,17 @@
     com.tencent.mobileqq
   app_activity:
     .activity.SplashActivity
-
+-
+  app_name:
+    clash
+  app_package:
+    com.github.kr328.clash
+  app_activity:
+    .MainActivity
+-
+  app_name:
+    百度手机助手
+  app_package:
+    com.baidu.appsearch
+  app_activity:
+    .SplashActivity
